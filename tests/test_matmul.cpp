@@ -13,13 +13,13 @@
 
 void test_matmul_small() {
     std::cout << "Running `test_matmul_small`...\n";
-    std::vector<std::vector<float>> A_data = {
+    std::vector<std::vector<int>> A_data = {
         {-1, -1, -1},
         {2, 2, 2},
         {0, 0, 0},
         {1, 0, -1}
     };
-    std::vector<std::vector<float>> B_data = {
+    std::vector<std::vector<int>> B_data = {
         {1, 1},
         {0, 2},
         {0, -1},
@@ -45,7 +45,7 @@ void test_matmul_medium() {
     int width = 31;
     int B_cols = 33;
 
-    std::vector<std::vector<float>> A_data;
+    std::vector<std::vector<int>> A_data;
     A_data.resize(A_rows);
     for (int i = 0; i < A_rows; ++i) {
         for (int j = 0; j < width; ++j) {
@@ -53,7 +53,7 @@ void test_matmul_medium() {
         }
     }
 
-    std::vector<std::vector<float>> B_data;
+    std::vector<std::vector<int>> B_data;
     B_data.resize(width);
     for (int i = 0; i < width; ++i) {
         for (int j = 0; j < B_cols; ++j) {
@@ -82,7 +82,7 @@ void test_matmul_large() {
     int width = 499;
     int B_cols = 766;
 
-    std::vector<std::vector<float>> A_data;
+    std::vector<std::vector<int>> A_data;
     A_data.resize(A_rows);
     for (int i = 0; i < A_rows; ++i) {
         for (int j = 0; j < width; ++j) {
@@ -90,7 +90,7 @@ void test_matmul_large() {
         }
     }
 
-    std::vector<std::vector<float>> B_data;
+    std::vector<std::vector<int>> B_data;
     B_data.resize(width);
     for (int i = 0; i < width; ++i) {
         for (int j = 0; j < B_cols; ++j) {
@@ -118,19 +118,19 @@ void test_mat_vec_mult_large() {
     int A_rows = 643;
     int width = 499;
 
-    std::vector<std::vector<float>> A_data;
+    std::vector<std::vector<int>> A_data;
     A_data.resize(A_rows);
     for (int i = 0; i < A_rows; ++i) {
         for (int j = 0; j < width; ++j) {
-            A_data[i].push_back(((i + j) % 54) - 11.123);
+            A_data[i].push_back(((i + j) % 54) - 11);
         }
     }
 
-    std::vector<float> B_data;
+    std::vector<int> B_data;
     B_data.reserve(width);
     for (int i = 0; i < width; ++i) {
         int sign = (i % 2 == 0) ? 1 : -1;
-        B_data.push(sign * (i * 2 - 43.672));
+        B_data.push_back(sign * (i * 2 - 43));
     }
     
 

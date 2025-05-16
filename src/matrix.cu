@@ -11,7 +11,6 @@
 #include "matrix.h"
 
 #define TILE_WIDTH 16
-#define EPSILON 0.00001
 
 #define CUDA_ASSERT(res) ( check_cuda_error((res), __FILE__, __LINE__) )
 inline void check_cuda_error(cudaError_t code, const char* file, int line) {
@@ -28,18 +27,18 @@ inline void check_cuda_error(cudaError_t code, const char* file, int line) {
 
 /*
 Use the CPU to perform matrix multiplication on pointers to 1D row-major
-matrix representations of floats.
+matrix representations of ints.
 
 Assumes dimensions match and `output` points to well-defined memory.
 */
 void cpu_matmul(
-    float* A, float* B, float* output,
+    int* A, int* B, int* output,
     uint32_t A_rows, uint32_t A_cols,
     uint32_t B_rows, uint32_t B_cols
 ) {
     for (int i = 0; i < A_rows; ++i) {
         for (int j = 0; j < B_cols; ++j) {
-            float entry = 0;
+            int entry = 0;
             for (int k = 0; k < A_cols; ++k) {
                 entry += A[i * A_cols + k] * B[k * B_cols + j];
             }
@@ -57,7 +56,7 @@ void cpu_matmul(
 
 __global__
 void untiled_gpu_matmul_kernel(
-    float* A, float* B, float* output,
+    int* A, int* B, int* output,
     uint32_t A_rows, uint32_t A_cols,
     uint32_t B_rows, uint32_t B_cols
 ) {
@@ -65,7 +64,7 @@ void untiled_gpu_matmul_kernel(
     uint32_t col = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (row < A_rows && col < B_cols) {
-        float entry = 0;
+        int entry = 0;
         for (int k = 0; k < A_cols; ++k) {
             entry += A[row * A_cols + k] * B[k * B_cols + col];
         }
@@ -75,23 +74,23 @@ void untiled_gpu_matmul_kernel(
 
 /*
 Use the GPU to perform matrix multiplication on pointers to 1D row-major
-matrix representations of floats. Does not utilize tiling. 
+matrix representations of ints. Does not utilize tiling. 
 
 Assumes dimensions match and `output` points to well-defined memory.
 */
 void untiled_gpu_matmul(
-    float* A_h, float* B_h, float* output_h,
+    int* A_h, int* B_h, int* output_h,
     uint32_t A_rows, uint32_t A_cols,
     uint32_t B_rows, uint32_t B_cols
 ) {
-    uint32_t A_size = A_rows * A_cols * sizeof(float);
-    uint32_t B_size = B_rows * B_cols * sizeof(float);
-    uint32_t output_size = A_rows * B_cols * sizeof(float);
+    uint32_t A_size = A_rows * A_cols * sizeof(int);
+    uint32_t B_size = B_rows * B_cols * sizeof(int);
+    uint32_t output_size = A_rows * B_cols * sizeof(int);
 
     // Allocate memory on device (GPU).
-    float* A_d;
-    float* B_d;
-    float* output_d;
+    int* A_d;
+    int* B_d;
+    int* output_d;
     cudaMalloc((void**)&A_d, A_size);
     cudaMalloc((void**)&B_d, B_size);
     cudaMalloc((void**)&output_d, output_size);
@@ -127,12 +126,12 @@ void untiled_gpu_matmul(
 
 __global__
 void gpu_matmul_kernel(
-    float* A, float* B, float* output,
+    int* A, int* B, int* output,
     uint32_t A_rows, uint32_t A_cols,
     uint32_t B_rows, uint32_t B_cols
 ) {
-    extern __shared__ float Ads[];
-    float* Bds = Ads + TILE_WIDTH * TILE_WIDTH;
+    extern __shared__ int Ads[];
+    int* Bds = Ads + TILE_WIDTH * TILE_WIDTH;
 
     int bx = blockIdx.x; int by = blockIdx.y;
     int tx = threadIdx.x; int ty = threadIdx.y;
@@ -142,10 +141,10 @@ void gpu_matmul_kernel(
     uint32_t row = by * blockDim.y + ty;
     uint32_t col = bx * blockDim.x + tx;
 
-    float entry = 0;
+    int entry = 0;
 
     // Repeatedly process tiles across A_cols (equal to B_rows).
-    for (int tile = 0; tile < ceil(float(A_cols) / TILE_WIDTH); ++tile) {
+    for (int tile = 0; tile < ceil(double(A_cols) / TILE_WIDTH); ++tile) {
         // (PHASE 1) Collaboratively load data into shared memory pool.
         if (row < A_rows && tile * TILE_WIDTH + tx < A_cols) {
             Ads[tile_idx] = A[row * A_cols + tile * TILE_WIDTH + tx];
@@ -182,24 +181,24 @@ void gpu_matmul_kernel(
 
 /*
 Use the GPU to perform matrix multiplication on pointers to 1D row-major
-matrix representations of floats. Utilizes tiling.
+matrix representations of ints. Utilizes tiling.
 
 Assumes dimensions match and `output` points to well-defined memory.
 */
 void gpu_matmul(
-    float* A_h, float* B_h, float* output_h,
+    int* A_h, int* B_h, int* output_h,
     uint32_t A_rows, uint32_t A_cols,
     uint32_t B_rows, uint32_t B_cols
 ) {
 
-    uint32_t A_size = A_rows * A_cols * sizeof(float);
-    uint32_t B_size = B_rows * B_cols * sizeof(float);
-    uint32_t output_size = A_rows * B_cols * sizeof(float);
+    uint32_t A_size = A_rows * A_cols * sizeof(int);
+    uint32_t B_size = B_rows * B_cols * sizeof(int);
+    uint32_t output_size = A_rows * B_cols * sizeof(int);
 
     // Allocate memory on device (GPU).
-    float* A_d;
-    float* B_d;
-    float* output_d;
+    int* A_d;
+    int* B_d;
+    int* output_d;
     cudaMalloc((void**)&A_d, A_size);
     cudaMalloc((void**)&B_d, B_size);
     cudaMalloc((void**)&output_d, output_size);
@@ -215,7 +214,7 @@ void gpu_matmul(
         ceil(double(A_rows) / TILE_WIDTH)
     );
 
-    int shared_mem_bytes = 2 * TILE_WIDTH * TILE_WIDTH * sizeof(float);
+    int shared_mem_bytes = 2 * TILE_WIDTH * TILE_WIDTH * sizeof(int);
     gpu_matmul_kernel<<<grid_dim, block_dim, shared_mem_bytes>>>(
         A_d, B_d, output_d,
         A_rows, A_cols, B_rows, B_cols
@@ -246,39 +245,39 @@ Matrix::Matrix() {}
 
 /* Construct matrix with given dimensions, but all elements are uninitialized. */
 Matrix::Matrix(size_t rows, size_t cols) :
-    data(new float[rows * cols]), num_rows(rows), num_cols(cols) {}
+    data(new int[rows * cols]), num_rows(rows), num_cols(cols) {}
 
 /* Construct matrix with given dimensions; init all elements to specified value. */
-Matrix::Matrix(size_t rows, size_t cols, float val) :
-    data(new float[rows * cols]), num_rows(rows), num_cols(cols) {
+Matrix::Matrix(size_t rows, size_t cols, int val) :
+    data(new int[rows * cols]), num_rows(rows), num_cols(cols) {
     for (int i = 0; i < rows * cols; ++i) {
         data[i] = val;
     }
 }
 
 /* Construct a matrix from the given 2D vector. */
-Matrix::Matrix(const std::vector<std::vector<float>>& mat) :
+Matrix::Matrix(const std::vector<std::vector<int>>& mat) :
     num_rows(mat.size()), num_cols(mat.empty() ? 0 : mat[0].size()) {
 
-    data = new float[num_rows * num_cols];
-    float* data_row = data;
+    data = new int[num_rows * num_cols];
+    int* data_row = data;
 
     for (const auto& row : mat) {
         if (row.size() != num_cols) {
             delete[] data;
             throw std::runtime_error("All rows of matrix must be equal length.");
         }
-        memcpy(data_row, row.data(), num_cols * sizeof(float));
+        memcpy(data_row, row.data(), num_cols * sizeof(int));
         data_row += num_cols;
     }
 }
 
 /* Construct an (N x 1) column vector from the given 1D vector. */
-Matrix::Matrix(const std::vector<float>& col_vec) {
+Matrix::Matrix(const std::vector<int>& col_vec) {
     num_rows = col_vec.size();
     num_cols = 1;
-    data = new float[num_rows * num_cols];
-    memcpy(data, col_vec.data(), num_rows * num_cols * sizeof(float));
+    data = new int[num_rows * num_cols];
+    memcpy(data, col_vec.data(), num_rows * num_cols * sizeof(int));
 }
 
 
@@ -293,12 +292,12 @@ Matrix::Matrix(const Matrix& other) {
     num_cols = other.num_cols;
     
     size_t mat_len = num_rows * num_cols;
-    data = new float[mat_len];
+    data = new int[mat_len];
 
     if (mat_len != 0 && other.data == nullptr) {
         throw std::runtime_error("Source data is nullptr when non-empty data expected.");
     }
-    memcpy(data, other.data, mat_len * sizeof(float));
+    memcpy(data, other.data, mat_len * sizeof(int));
 }
 
 Matrix& Matrix::operator=(const Matrix& other) {
@@ -307,8 +306,8 @@ Matrix& Matrix::operator=(const Matrix& other) {
         num_rows = other.num_rows;
         num_cols = other.num_cols;
         size_t mat_len = num_rows * num_cols;
-        data = new float[mat_len];
-        memcpy(data, other.data, mat_len * sizeof(float));
+        data = new int[mat_len];
+        memcpy(data, other.data, mat_len * sizeof(int));
     }
     return *this;
 }
@@ -338,10 +337,10 @@ Matrix& Matrix::operator=(Matrix&& other) noexcept {
 
 /* --- UTILITY --- */
 
-float* Matrix::operator[](size_t index) {
+int* Matrix::operator[](size_t index) {
     return data + (index * num_cols);
 }
-const float* Matrix::operator[](size_t index) const {
+const int* Matrix::operator[](size_t index) const {
     return data + (index * num_cols);
 }
 bool Matrix::operator==(const Matrix& other) {
@@ -351,7 +350,7 @@ bool Matrix::operator==(const Matrix& other) {
 
     for (int i = 0; i < num_rows; ++i) {
         for (int j = 0; j < num_cols; ++j) {
-            if (fabs((*this)[i][j] - other[i][j]) > EPSILON) {
+            if ((*this)[i][j] != other[i][j]) {
                 return false;
             }
         }

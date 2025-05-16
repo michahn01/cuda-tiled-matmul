@@ -17,13 +17,13 @@ public:
     Matrix(size_t rows, size_t cols);
 
     /* Construct matrix with given dimensions; init all elements to specified value. */
-    Matrix(size_t rows, size_t cols, float val);
+    Matrix(size_t rows, size_t cols, int val);
 
     /* Construct a matrix from the given 2D vector. */
-    Matrix(const std::vector<std::vector<float>>& mat);
+    Matrix(const std::vector<std::vector<int>>& mat);
 
     /* Construct an (N x 1) column vector from the given 1D vector. */
-    Matrix(const std::vector<float>& col_vec);
+    Matrix(const std::vector<int>& col_vec);
 
 
     /* -------------------------------------------------------------------- */
@@ -42,8 +42,8 @@ public:
     /* -------------------------------------------------------------------- */
 
     /* Note: [] accesses will not be bounds-checked. */
-    float* operator[](size_t index);
-    const float* operator[](size_t index) const;
+    int* operator[](size_t index);
+    const int* operator[](size_t index) const;
 
     bool operator==(const Matrix& other);
     size_t getRows() const;
@@ -67,8 +67,8 @@ public:
 
 
 private:
-    // Internally, data is represented as a flattened row-major array of floats.
-    float* data = nullptr;
+    // Internally, data is represented as a flattened row-major array of ints.
+    int* data = nullptr;
     size_t num_rows = 0;
     size_t num_cols = 0;
 };
