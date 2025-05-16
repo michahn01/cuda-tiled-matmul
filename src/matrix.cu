@@ -109,10 +109,10 @@ void untiled_gpu_matmul(
     );
 
     // Check that kernel launch was successful.
-    GPU_ASSERT(cudaGetLastError());
+    CUDA_ASSERT(cudaGetLastError());
 
     // Copy answer from device to host.
-    GPU_ASSERT(cudaMemcpy(output_h, output_d, output_size, cudaMemcpyDeviceToHost));
+    CUDA_ASSERT(cudaMemcpy(output_h, output_d, output_size, cudaMemcpyDeviceToHost));
 
     // Free memory and return.
     cudaFree(A_d);
@@ -222,10 +222,10 @@ void gpu_matmul(
     );
 
     // Check that kernel launch was successful.
-    GPU_ASSERT(cudaGetLastError());
+    CUDA_ASSERT(cudaGetLastError());
 
     // Copy answer from device to host.
-    GPU_ASSERT(cudaMemcpy(output_h, output_d, output_size, cudaMemcpyDeviceToHost));
+    CUDA_ASSERT(cudaMemcpy(output_h, output_d, output_size, cudaMemcpyDeviceToHost));
 
     // Free memory and return.
     cudaFree(A_d);
