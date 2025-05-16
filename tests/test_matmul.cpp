@@ -3,7 +3,7 @@
 
 #include "matrix.h"
 
-void test_matmul_simple() {
+void test_matmul_small() {
     std::vector<std::vector<float>> A = {
         {-1, -1, -1},
         {2, 2, 2},
@@ -26,5 +26,5 @@ void test_matmul_simple() {
 }
 
 int main() {
-    test_matmul_simple();
+    test_matmul_small();
 }
