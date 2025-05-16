@@ -5,6 +5,7 @@
 
 #include <vector>
 #include <stdexcept>
+#include <utility>
 
 #include <cuda_runtime.h>
 
@@ -242,7 +243,10 @@ void gpu_matmul(
 /* --- CONSTRUCTORS --- */
 
 /* Construct a 0x0 matrix with no data. */
-Matrix::Matrix() {}
+Matrix::Matrix() :
+    // Note: `new int[0]` is indeed well-defined and is chosen here for the 0-case
+    // over keeping `data` as nullptr to be consistent with other constructors.
+    data(new int[0]), num_rows(0), num_cols(0) {}
 
 /* Construct matrix with given dimensions, but all elements are uninitialized. */
 Matrix::Matrix(size_t rows, size_t cols) :
@@ -291,24 +295,25 @@ Matrix::~Matrix() {
 Matrix::Matrix(const Matrix& other) {
     num_rows = other.num_rows;
     num_cols = other.num_cols;
-    
     size_t mat_len = num_rows * num_cols;
-    data = new int[mat_len];
-
-    if (mat_len != 0 && other.data == nullptr) {
-        throw std::runtime_error("Source data is nullptr when non-empty data expected.");
+    if (other.data != nullptr) {
+        data = new int[mat_len];
+        memcpy(data, other.data, mat_len * sizeof(int));
     }
-    memcpy(data, other.data, mat_len * sizeof(int));
+    else if (mat_len == 0) {
+        data = new int[0];
+    }
+    else {
+        throw std::runtime_error("Source data is nullptr when non-empty data expected");
+    }
 }
 
 Matrix& Matrix::operator=(const Matrix& other) {
     if (this != &other) {
-        delete[] data;
-        num_rows = other.num_rows;
-        num_cols = other.num_cols;
-        size_t mat_len = num_rows * num_cols;
-        data = new int[mat_len];
-        memcpy(data, other.data, mat_len * sizeof(int));
+        Matrix src(other);
+        std::swap(num_rows, src.num_rows);
+        std::swap(num_cols, src.num_cols);
+        std::swap(data, src.data);
     }
     return *this;
 }
