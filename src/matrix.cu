@@ -162,6 +162,7 @@ void gpu_matmul_kernel(
         // Wait for all threads to finish filling up shared memory.
         __syncthreads();
 
+        // (PHASE 2) Use collaboratively loaded data to accumulate entry.
         for (int k = 0; k < TILE_WIDTH; ++k) {
             // Ads[ty][k] * Bds[k][tx]
             entry += (
