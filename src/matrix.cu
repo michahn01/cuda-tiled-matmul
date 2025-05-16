@@ -232,3 +232,184 @@ void gpu_matmul(
     cudaFree(B_d);
     cudaFree(output_d);
 }
+
+
+/* -------------------------------------------------------------------- */
+/* ------------------ `MATRIX` CLASS IMPLEMENTATION ------------------- */
+/* -------------------------------------------------------------------- */
+
+
+/* --- CONSTRUCTORS --- */
+
+/* Construct a 0x0 matrix with no data. */
+Matrix::Matrix() {}
+
+/* Construct matrix with given dimensions, but all elements are uninitialized. */
+Matrix::Matrix(size_t rows, size_t cols) :
+    data(new float[rows * cols]), num_rows(rows), num_cols(cols) {}
+
+/* Construct matrix with given dimensions; init all elements to specified value. */
+Matrix::Matrix(size_t rows, size_t cols, float val) :
+    data(new float[rows * cols]), num_rows(rows), num_cols(cols) {
+    for (int i = 0; i < rows * cols; ++i) {
+        data[i] = val;
+    }
+}
+
+/* Construct a matrix from the given 2D vector. */
+Matrix::Matrix(const std::vector<std::vector<float>>& mat) :
+    num_rows(mat.size()), num_cols(mat.empty() ? 0 : mat[0].size()) {
+
+    data = new float[num_rows * num_cols];
+    float* data_row = data;
+
+    for (const auto& row : mat) {
+        if (row.size() != num_cols) {
+            delete[] data;
+            throw std::runtime_error("All rows of matrix must be equal length.");
+        }
+        memcpy(data_row, row.data(), num_cols * sizeof(float));
+        data_row += num_cols;
+    }
+}
+
+/* Construct an (N x 1) column vector from the given 1D vector. */
+Matrix::Matrix(const std::vector<float>& col_vec) {
+    num_rows = col_vec.size();
+    num_cols = 1;
+    data = new float[num_rows * num_cols]
+    memcpy(data, col_vec.data(), num_rows * num_cols * sizeof(float));
+}
+
+
+/* --- MEMORY MANAGEMENT (rule of five) --- */
+
+Matrix::~Matrix() {
+    delete[] data;
+}
+
+Matrix::Matrix(const Matrix& other) {
+    num_rows = other.num_rows;
+    num_cols = other.num_cols;
+    
+    size_t mat_len = num_rows * num_cols;
+    data = new float[mat_len];
+
+    if (mat_len != 0 && other.data == nullptr) {
+        throw std::runtime_error("Source data is nullptr when non-empty data expected.");
+    }
+    memcpy(data, other.data, mat_len * sizeof(float));
+}
+
+Matrix::Matrix& operator=(const Matrix& other) {
+    if (this != &other) {
+        delete[] data;
+        num_rows = other.num_rows;
+        num_cols = other.num_cols;
+        size_t mat_len = num_rows * num_cols;
+        data = new float[mat_len];
+        memcpy(data, other.data, mat_len * sizeof(float));
+    }
+    return *this;
+}
+
+Matrix::Matrix(Matrix&& other) noexcept
+    : data(other.data), num_rows(other.num_rows), num_cols(other.num_cols) {
+    other.data = nullptr;
+    other.num_rows = 0;
+    other.num_cols = 0;
+}
+
+Matrix& Matrix::operator=(Matrix&& other) noexcept {
+    if (this != &other) {
+        delete[] data;
+
+        data = other.data;
+        num_rows = other.num_rows;
+        num_cols = other.num_cols;
+
+        other.data = nullptr;
+        other.num_rows = 0;
+        other.num_cols = 0;
+    }
+    return *this;
+}
+
+
+/* --- UTILITY --- */
+
+float* Matrix::operator[](size_t index) {
+    return data + (index * num_cols);
+}
+const float* Matrix::operator[](size_t index) const {
+    return data + (index * num_cols);
+}
+bool Matrix::operator==(const Matrix& other) {
+    if (num_rows != other.num_rows || num_cols != other.num_cols) {
+        return false;
+    }
+
+    for (int i = 0; i < num_rows; ++i) {
+        for (int j = 0; j < num_cols; ++j) {
+            if (fabs((*this)[i][j] - other[i][j]) > EPSILON) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+size_t Matrix::getRows() const {
+    return num_rows;
+}
+size_t Matrix::getCols() const {
+    return num_cols;
+}
+
+
+/* --- MATRIX MULTIPLICATION --- */
+
+Matrix Matrix::operator*(const Matrix& other) {
+    if (num_cols != other.num_rows) {
+        throw std::runtime_error("Matrices must have compatible dimensions.");
+    }
+
+    Matrix result(num_rows, other.num_cols);
+    gpu_matmul(
+        data, other.data, result.data,
+        num_rows, num_cols,
+        other.num_rows, other.num_cols
+    );
+    return result;
+}
+
+Matrix Matrix::matmul(const Matrix& other, MatMulType type) {
+    if (num_cols != other.num_rows) {
+        throw std::runtime_error("Matrices must have compatible dimensions.");
+    }
+
+    Matrix result(num_rows, other.num_cols);
+
+    if (type == Matrix::MatMulType::CPU) {
+        cpu_matmul(
+            data, other.data, result.data,
+            num_rows, num_cols,
+            other.num_rows, other.num_cols
+        );
+    }
+    else if (type == Matrix::MatMulType::GPU_NO_TILING) {
+        untiled_gpu_matmul(
+            data, other.data, result.data,
+            num_rows, num_cols,
+            other.num_rows, other.num_cols
+        );
+    }
+    else if (type == Matrix::MatMulType::GPU_TILING) {
+        gpu_matmul(
+            data, other.data, result.data,
+            num_rows, num_cols,
+            other.num_rows, other.num_cols
+        );
+    }
+    return result;
+}
