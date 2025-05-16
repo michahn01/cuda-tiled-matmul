@@ -277,7 +277,7 @@ Matrix::Matrix(const std::vector<std::vector<float>>& mat) :
 Matrix::Matrix(const std::vector<float>& col_vec) {
     num_rows = col_vec.size();
     num_cols = 1;
-    data = new float[num_rows * num_cols]
+    data = new float[num_rows * num_cols];
     memcpy(data, col_vec.data(), num_rows * num_cols * sizeof(float));
 }
 
@@ -301,7 +301,7 @@ Matrix::Matrix(const Matrix& other) {
     memcpy(data, other.data, mat_len * sizeof(float));
 }
 
-Matrix::Matrix& operator=(const Matrix& other) {
+Matrix& Matrix::operator=(const Matrix& other) {
     if (this != &other) {
         delete[] data;
         num_rows = other.num_rows;
