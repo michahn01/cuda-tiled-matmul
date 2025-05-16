@@ -148,9 +148,93 @@ void test_mat_vec_mult_large() {
     std::cout << "    > Passed `test_mat_vec_mult_large`\n";
 }
 
+void test_consecutive_mults() {
+    std::cout << "Running `test_consecutive_mults`...\n";
+
+    int width = 66;
+
+    std::vector<std::vector<int>> A_data;
+    A_data.resize(width);
+    for (int i = 0; i < width; ++i) {
+        for (int j = 0; j < width; ++j) {
+            A_data[i].push_back(((i + j) % 6) - 11);
+        }
+    }
+    Matrix A(A_data);
+
+    std::vector<std::vector<int>> B_data;
+    B_data.resize(width);
+    for (int i = 0; i < width; ++i) {
+        for (int j = 0; j < width; ++j) {
+            B_data[i].push_back((i - 2 * j) % 7);
+        }
+    }
+    Matrix B(B_data);
+
+    Matrix mat_cpu = A, mat_gpu_untiled = A, mat_gpu_tiled = A;
+
+    // 4 consecutive Matrix-Matrix multiplications
+    for (int i = 0; i < 4; ++i) {
+        mat_cpu = B.matmul(mat_cpu, Matrix::MatMulType::CPU);
+        mat_gpu_untiled = B.matmul(mat_gpu_untiled, Matrix::MatMulType::GPU_NO_TILING);
+        mat_gpu_tiled = B.matmul(mat_gpu_tiled, Matrix::MatMulType::GPU_TILING);
+    }
+
+    assert(mat_cpu == mat_gpu_untiled);
+    assert(mat_gpu_untiled == mat_gpu_tiled);
+    assert(mat_cpu == mat_gpu_tiled);
+
+    // Construct a vector
+    std::vector<int> vec_data;
+    vec_data.reserve(width);
+    for (int i = 0; i < width; ++i) {
+        int sign = (i % 2 == 0) ? 1 : -1;
+        vec_data.push_back(sign * (i % 8));
+    }
+    Matrix vector(vec_data);
+
+    // Multiply vector to accumulated matrices
+    mat_cpu = mat_cpu.matmul(vector, Matrix::MatMulType::CPU);
+    mat_gpu_untiled = mat_gpu_untiled.matmul(vector, Matrix::MatMulType::GPU_NO_TILING);
+    mat_gpu_tiled = mat_gpu_tiled.matmul(vector, Matrix::MatMulType::GPU_TILING);
+
+    assert(mat_cpu.getRows() == 66); assert(mat_cpu.getCols() == 1);
+    assert(mat_gpu_untiled.getRows() == 66); assert(mat_gpu_untiled.getCols() == 1);
+    assert(mat_gpu_tiled.getRows() == 66); assert(mat_gpu_tiled.getCols() == 1);
+
+    assert(mat_cpu == mat_gpu_untiled);
+    assert(mat_gpu_untiled == mat_gpu_tiled);
+    assert(mat_cpu == mat_gpu_tiled);
+
+    // Results should be same as if BBBBA * vec is done step-by-step
+    Matrix vec_cpu = vector, vec_gpu_untiled = vector, vec_gpu_tiled = vector;
+
+    vec_cpu = A.matmul(vec_cpu, Matrix::MatMulType::CPU);
+    vec_gpu_untiled = A.matmul(vec_gpu_untiled, Matrix::MatMulType::GPU_NO_TILING);
+    vec_gpu_tiled = A.matmul(vec_gpu_tiled, Matrix::MatMulType::GPU_TILING);
+
+    for (int i = 0; i < 4; ++i) {
+        vec_cpu = B.matmul(vec_cpu, Matrix::MatMulType::CPU);
+        vec_gpu_untiled = B.matmul(vec_gpu_untiled, Matrix::MatMulType::GPU_NO_TILING);
+        vec_gpu_tiled = B.matmul(vec_gpu_tiled, Matrix::MatMulType::GPU_TILING);
+    }
+
+    assert(vec_cpu == vec_gpu_untiled);
+    assert(vec_gpu_untiled == vec_gpu_tiled);
+    assert(vec_cpu == vec_gpu_tiled);
+
+    assert(vec_cpu == mat_cpu);
+    assert(vec_gpu_untiled == mat_gpu_untiled);
+    assert(vec_gpu_tiled == mat_gpu_tiled);
+
+    std::cout << "    > Passed `test_consecutive_mults`\n";
+}
+
+
 int main() {
     test_matmul_small();
     test_matmul_medium();
     test_matmul_large();
     test_mat_vec_mult_large();
+    test_consecutive_mults();
 }
